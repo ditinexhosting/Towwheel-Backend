@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+
+<head>
+    <script src='/socket.io/socket.io.js'></script>
+    <script>
+        var socket = io('http://192.168.0.114:3002/room-chat');
+        socket.connect();
+        socket.on('connect', function () {
+            addMessage('connected');
+            socket.emit('enter','602ede7170eab03e58c88509', {
+                _id: '602acfad5aaa2632441f1680',
+                profile_picture: '/images/1613301612944.jpg',
+                name: 'Souradeep Das',
+                gender: 'male'
+            })
+
+            setTimeout(()=>{
+                //socket.emit('send_message', { _id: '1234', content: 'Message from sou', type: 'text' })
+            },3000)
+
+        });
+        
+        socket.on('error', console.error.bind(console));
+        socket.on('new_message', console.log.bind(console));
+
+        function addMessage(message) {
+            var text = document.createTextNode(message),
+                el = document.createElement('li'),
+                messages = document.getElementById('messages');
+
+            el.appendChild(text);
+            messages.appendChild(el);
+        }
+    </script>
+</head>
+
+<body>
+    <h1>Socket</h1>
+    <ul id='messages'></ul>
+</body>
+
+</html>
