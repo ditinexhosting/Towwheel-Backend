@@ -1,2 +1,2 @@
-exports.Sms = require('./sms');
+exports.SendSms = require('./sms');
 exports.RealtimeListener = require('./realtimeDbHelper')

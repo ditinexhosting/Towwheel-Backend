@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const Config = require('../config.js')
-const { Sms } = require('../services')
+const { SendSms } = require('../services')
 const { Otp, User, ProfilePicture } = require('../models')
 
 const {
@@ -57,12 +57,6 @@ module.exports = {
 					})
 					let userData = {... updated._doc}
 
-					let get_profile_picture = await Find({
-						model: ProfilePicture,
-						where: {_id: userData.profile_picture_id}
-					})
-					userData.profile_picture = get_profile_picture[0].picture
-
 					if(!updated)
 						return HandleError(res, 'Failed to generate access token.')
 					
@@ -85,12 +79,11 @@ module.exports = {
 
 			const otpValue = Math.floor(1000 + Math.random() * 9000);
 			var smsStatus = null
-			if(Config.environment!=='DEV'){
-			if(Config.sms_apikey)
-				smsStatus = await Sms.sendOtp(mobile,otpValue)
+			// if(Config.environment!=='DEV'){
+			smsStatus = await SendSms(mobile,otpValue)
 			if(!smsStatus)
 				return HandleError(res, 'Failed to send OTP. Please contact system admin.')
-			}
+			// }
 			const inserted = await Insert({
 				model: Otp,
 				data: {otp: otpValue, mobile: mobile}
@@ -108,64 +101,10 @@ module.exports = {
 
 	Signup: async (req, res, next) => {
 		try {
-			const { name = '', gender = '', mobile = '', username = '', dob = '', city = '', country = '', bio = '', relation_status = '', occupation = '', hobbies = '' } = req.body
-			const profile_picture = req.files?req.files.profile_picture:null
+			const { name = '', mobile = '' } = req.body
 
-			let validateError = null
-			if (!ValidateAlphanumeric(name.trim()) || !ValidateLength(name.trim()))
-				validateError = 'Please enter a valid name without any special character and less than 25 character.'
-			else if (gender.trim() == '')
-				validateError = 'Please select gender.'
-			else if (username == '')
-				validateError = 'Username can\'t be blank.'
-			else if (dob == '')
-				validateError = 'DOB can\'t be blank.'
-			else if (city == '')
-				validateError = 'City can\'t be blank.'
-			else if (!ValidateMobile(mobile.trim()))
-				validateError = 'Please enter a valid mobile number without ISD code i.e 990xxxxx05.'
-			else if (!profile_picture)
-				validateError = 'Please upload a profile picture.'
-
-			if (validateError)
-				return HandleError(res, validateError)
-
-			let data = { name, gender, mobile, username, dob, city, country,bio, relation_status, occupation, hobbies }
-			data.active_session_refresh_token = GeneratePassword()
-
-			let inserted = await Insert({
-				model: User,
-				data: data
-			})
-			if (!inserted)
-				return HandleError(res, 'Failed to create account. Please contact system admin.')
-
-			inserted = { ...inserted._doc }
-			const access_token = jwt.sign({ id: inserted._id, mobile: inserted.mobile, name: inserted.name }, Config.secret, {
-				expiresIn: Config.tokenExpiryLimit // 86400 expires in 24 hours -- It should be 1 hour in production
-			});
-
-			let isUploaded = await CompressImageAndUpload(profile_picture)
-			if(!isUploaded)
-				return HandleError(res,"Failed to upload profile pic.")
-
-			let dp = await Insert({
-				model: ProfilePicture,
-				data: { picture: isUploaded.path, user_id: inserted._id }
-			})
-
-			let updated = await FindAndUpdate({
-				model: User,
-				where: {_id: inserted._id},
-				update: {$set: {last_seen: Date.now(), online_status: true, access_token: access_token, profile_picture_id: dp._id} }
-			})
-			if(!updated)
-				return HandleError(res, 'Failed to update access token or profile picture.')
 			
-			let user = {... updated._doc}
-			user.profile_picture = isUploaded.path
-			
-			return HandleSuccess(res, user)
+			// return HandleSuccess(res, user)
 
 		} catch (err) {
 			HandleServerError(res, req, err)
@@ -193,7 +132,7 @@ module.exports = {
 			let updated = await FindAndUpdate({
 				model: User,
 				where: { _id: isUserExists[0]._id },
-				update: { $set: {last_seen: Date.now(), online_status: true, access_token: access_token } }
+				update: { $set: {access_token: access_token } }
 			})
 			if (!updated)
 				return HandleError(res, 'Failed to generate access token.')
@@ -225,17 +164,12 @@ module.exports = {
 			let updated = await FindAndUpdate({
 				model: User,
 				where: { _id: isUserExists[0]._id },
-				update: { $set: {last_seen: Date.now(), online_status: true, access_token: access_token } }
+				update: { $set: {access_token: access_token } }
 			})
 			if (!updated)
 				return HandleError(res, 'Failed to generate access token.')
 
 			let user = {... updated._doc}
-			let get_profile_picture = await Find({
-				model: ProfilePicture,
-				where: {_id: user.profile_picture_id}
-			})
-			user.profile_picture = get_profile_picture[0].picture
 			user.isUserExists = true
 			return HandleSuccess(res, user)
 

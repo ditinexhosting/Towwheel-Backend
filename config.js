@@ -15,6 +15,5 @@ module.exports = {
 	publicImagePath: 'public/images/',
 	tokenExpiryLimit: 86400,
 	otpExpiryLimit: 1,
-	sms_apikey: process.env.SMS_APIKEY,
 	environment: process.env.ENVIRONMENT
 }
