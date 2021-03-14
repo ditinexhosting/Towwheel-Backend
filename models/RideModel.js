@@ -5,7 +5,7 @@ const PaymentSchema=new Schema({
     ride: { type: Schema.Types.ObjectId, ref: 'rides', required: true },
 	cost: { type: Number, required: true },
 	is_paid: { type: Boolean, required: true, default: false },
-	payment_mode: { type: String, required: true, trim: true, enum: ['cash', 'online'] }
+	payment_mode: { type: String, required: true, trim: true, enum: ['cash', 'payment_gateway'] }
 },{ timestamps: true })
 
 
@@ -35,7 +35,7 @@ const RideSchema = new Schema({
 		},
 	},
 	distance: { type: Number, required: true },
-	ride_status: { type: String, required: true, trim: true, enum: ['accepted', 'started', 'completed'] },
+	ride_status: { type: String, required: true, trim: true, enum: ['accepted', 'started', 'completed', 'cancelled'] },
     payment_details: [PaymentSchema]
 },{ timestamps: true })
 
