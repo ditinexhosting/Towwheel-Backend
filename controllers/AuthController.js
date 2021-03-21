@@ -79,11 +79,11 @@ module.exports = {
 
 			const otpValue = Math.floor(1000 + Math.random() * 9000);
 			var smsStatus = null
-			// if(Config.environment!=='DEV'){
+			if(Config.environment!=='DEV'){
 			smsStatus = await SendSms(mobile,otpValue)
 			if(!smsStatus)
 				return HandleError(res, 'Failed to send OTP. Please contact system admin.')
-			// }
+			}
 			const inserted = await Insert({
 				model: Otp,
 				data: {otp: otpValue, mobile: mobile}

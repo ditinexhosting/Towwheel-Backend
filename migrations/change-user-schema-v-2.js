@@ -9,6 +9,8 @@ module.exports = async () => {
 			.exec()
 		console.log('Migration of change-user-schema completed.')
 		return true*/
+		console.log('Migration of change-user-schema completed.')
+		return true
 	}
 	catch (e) {
 		console.log('Migration of change-user-schema failed with follwing error ==> ', e)
