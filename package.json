@@ -17,14 +17,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ditinex/InRange-backend.git"
+    "url": "git+https://github.com/ditinexhosting/Towwheel-Backend.git"
   },
   "author": "Ditinex",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/ditinex/InRange-backend/issues"
+    "url": "https://github.com/ditinexhosting/Towwheel-Backend/issues"
   },
-  "homepage": "https://github.com/ditinex/InRange-backend#readme",
+  "homepage": "https://github.com/ditinexhosting/Towwheel-Backend#readme",
   "dependencies": {
     "aws-sdk": "^2.863.0",
     "bcryptjs": "^2.4.3",

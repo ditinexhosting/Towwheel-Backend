@@ -29,7 +29,7 @@ router.get('/', (req, res) => {
 router.use('/auth', require('./auth'));
 
 // Protect all routes after this middleware
-router.use(VerifyToken);
+// router.use(VerifyToken);
 
 router.use('/home', require('./home'));
 
