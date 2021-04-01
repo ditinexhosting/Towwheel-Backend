@@ -1,10 +1,15 @@
 const express = require('express');
 const router = express.Router();
 
+const { VerifyToken } = require('../middlewares');
+
 const Controllers = require('../controllers')
 const Home = Controllers.Home
 
 
-//router.get('/get-newsfeeds',Home.getNewsfeeds);
+router.get('/get-nearest-tows',Home.getNearestTows);
+
+// Protect router after that
+router.use(VerifyToken);
 
 module.exports = router;

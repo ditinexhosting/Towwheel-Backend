@@ -1,6 +1,7 @@
 
 # Env
 .env
+.env.local
 
 # node.js
 #
