@@ -1,22 +1,18 @@
 const mongoose = require('mongoose')
 const Schema = mongoose.Schema
 
-const PaymentSchema=new Schema({
-    ride: { type: Schema.Types.ObjectId, ref: 'rides', required: true },
-	cost: { type: Number, required: true },
-	is_paid: { type: Boolean, required: true, default: false },
-	payment_mode: { type: String, required: true, trim: true, enum: ['cash', 'payment_gateway'] }
-},{ timestamps: true })
-
-
 const RideSchema = new Schema({
-    user: { type: Schema.Types.ObjectId, ref: 'users', required: true },
-    driver: { type: Schema.Types.ObjectId, ref: 'drivers', required: true },
+	user: { type: Schema.Types.ObjectId, ref: 'users', required: true },
+	assigned_driver: { type: Schema.Types.ObjectId, ref: 'drivers' },
+	assigned_vehicle: { type: Schema.Types.ObjectId, ref: 'vehicles' },
+	available_drivers: [{ type: Schema.Types.ObjectId, ref: 'drivers'}],
+	required_vehicle_type: { type: String, required: true, trim: true, enum: ['BIKE', 'TRUCK', 'PRIVATE'] },
 	source: {
 		type: {
 			type: String,
 			enum: ['Point'],
-			required: true
+			required: true,
+			default: 'Point'
 		},
 		coordinates: {
 			type: [Number],
@@ -27,7 +23,8 @@ const RideSchema = new Schema({
 		type: {
 			type: String,
 			enum: ['Point'],
-			required: true
+			required: true,
+			default: 'Point'
 		},
 		coordinates: {
 			type: [Number],
@@ -35,9 +32,14 @@ const RideSchema = new Schema({
 		},
 	},
 	distance: { type: Number, required: true },
-	ride_status: { type: String, required: true, trim: true, enum: ['accepted', 'started', 'completed', 'cancelled'] },
-    payment_details: [PaymentSchema]
-},{ timestamps: true })
+	time: { type: Number, required: true },
+	ride_status: { type: String, required: true, trim: true, enum: ['searching', 'accepted', 'started', 'completed', 'cancelled'] },
+	payment_details: {
+		cost: { type: Number, required: true, default: 0 },
+		is_paid: { type: Boolean, required: true, default: false },
+		payment_mode: { type: String, required: true, default: 'cash', trim: true, enum: ['cash', 'payment_gateway'] }
+	}
+}, { timestamps: true })
 
 RideSchema.index({ location: '2dsphere' });
 
