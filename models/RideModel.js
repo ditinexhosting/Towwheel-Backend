@@ -11,25 +11,25 @@ const RideSchema = new Schema({
 		type: {
 			type: String,
 			enum: ['Point'],
-			required: true,
-			default: 'Point'
+			required: true
 		},
 		coordinates: {
 			type: [Number],
 			required: true
 		},
+		address: { type: String, required: true, trim: true }
 	},
 	destination: {
 		type: {
 			type: String,
 			enum: ['Point'],
-			required: true,
-			default: 'Point'
+			required: true
 		},
 		coordinates: {
 			type: [Number],
 			required: true
 		},
+		address: { type: String, required: true, trim: true }
 	},
 	distance: { type: Number, required: true },
 	time: { type: Number, required: true },
@@ -41,7 +41,7 @@ const RideSchema = new Schema({
 	}
 }, { timestamps: true })
 
-RideSchema.index({ location: '2dsphere' });
+RideSchema.index({ source: '2dsphere', destination: '2dsphere' });
 
 const RideModel = mongoose.model('rides', RideSchema)
 module.exports = RideModel

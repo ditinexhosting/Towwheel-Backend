@@ -43,13 +43,21 @@ module.exports = {
 	},
 	createRideRequest: async (req, res, next) => {
 		try {
-			const { source, destination, distance, time, tow_type } = req.body
+			const { source_address, destination_address, source, destination, distance, time, tow_type } = req.body
 			const user_id = req.user_id
 			let inserted = await Insert({
 				model: Ride,
 				data: {
-					'source.coordinates' : source,
-					'destination.coordinates': destination,
+					source : {
+						type: 'Point',
+						coordinates: source,
+						address: source_address
+					},
+					destination : {
+						type: 'Point',
+						coordinates: destination,
+						address: destination_address
+					},
 					distance: distance,
 					time: time,
 					required_vehicle_type: tow_type,
