@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const Config = require('../config.js');
 const fs = require('fs');
 const { RealtimeListener } = require('../services')
-const { User, Mongoose, PersonalChat, RoomChat, ProfilePicture } = require('../models')
+const { User, ProfilePicture, Driver, Vehicle, Ride, Mongoose } = require('../models')
 const Controllers = require('../controllers')
 
 const {
@@ -12,75 +12,76 @@ const {
 	ValidateEmail, PasswordStrength, ValidateAlphanumeric, ValidateLength, ValidateMobile, isDataURL, GeneratePassword, FindOne
 } = require('./BaseController');
 
+var online_drivers = []
+var ride_requests = []
+
 module.exports = {
 
-	PersonalChat: async (socket, io) => {
+	DriverRideRequest: async (socket, io) => {
 		try {
+			let driver_id = null
+			socket.on('initialize', async (data) => {
+				driver_id = data._id
+				const location = data.location
+				socket.join(driver_id);
+				online_drivers.push(driver_id)
+				
+				const driver_vehicles_data = await Find({
+					model: Driver,
+					where: { _id: driver_id },
+					select: { vehicles: 1 },
+					populate: 'vehicles'
+				})
+				if (!driver_vehicles_data)
+					return
 
-			socket.on('startchat', async function (chat_id, sender_id, receiver_id) {
-				const room_name = chat_id;
-				socket.join(room_name);
-				let updated = await FindAndUpdate(PersonalChat, { _id: chat_id, "chats.receiver_id": receiver_id, "chats.seen": false }, { "chats.$[].seen": true });
-				let chatList = await Find(PersonalChat, { _id: chat_id }, { chats: { $slice: [0, 50] } }, { 'chats.createdAt': -1 });
-				socket.emit('chathistory', chatList[0].chats);
+				const driver_owned_vehicles = driver_vehicles_data[0].vehicles.map(item => item.type)
+
+				const nearest_ride_requests = await Find({
+					model: Ride,
+					where: {
+						source: {
+							$near: {
+								$geometry: {
+									type: "Point",
+									coordinates: [location.longitude, location.latitude]
+								},
+								$maxDistance: Config.max_map_range,
+							}
+						},
+						ride_status: 'searching',
+						required_vehicle_type: { $in: driver_owned_vehicles }
+					}
+				})
+
+				if (!nearest_ride_requests)
+					return 
+
+				socket.emit('initial_ride_requests', nearest_ride_requests);
 			});
 
-			socket.on('send_message', async ({ chat_id, sender_id, receiver_id, message }) => {
-				const room_name = chat_id;
-				let data = {
-					sender_id: sender_id,
-					receiver_id: receiver_id,
-					message: message,
-					seen: false
-				}
-
-				const room_length = io.of("/personal-chat").adapter.rooms.get(room_name).size
-
-				if (room_length > 1) {
-					data.seen = true
-				}
-
-				const where = { _id: chat_id }
-				const query = { $push: { chats: data } }
-
-				let updated = await FindAndUpdate(PersonalChat, where, query, true)
-				if (updated) {
-					if (room_length > 1)
-						socket.broadcast.to(room_name).emit('message', data);
-					else {
-						// notification
-					}
-				}
+			socket.on('accept_tow_request', async (data,callback)=>{
+				const update = await FindAndUpdate({
+					model: Ride,
+					where: { _id: data.ride_id },
+					update: { $push: { available_drivers: data.driver_id } }
+				});
+				if(update)
+				callback(true)
 			});
 
-			socket.on('send_image', async ({ chat_id, sender_id, receiver_id, image_path }) => {
-				//Upload the image via api call first then send socket data with image id
-				const room_name = chat_id;
+			socket.on('decline_tow_request', async (data,callback)=>{
+				const update = await FindAndUpdate({
+					model: Ride,
+					where: { _id: data.ride_id },
+					update: { $pull: { available_drivers: data.driver_id } }
+				});
+				if(update)
+				callback(true)
+			});
 
-				let data = {
-					sender_id: sender_id,
-					receiver_id: receiver_id,
-					image: image_path,
-					seen: false
-				}
-
-				const room_length = io.of("/personal-chat").adapter.rooms.get(room_name).size
-
-				if (room_length > 1) {
-					data.seen = true
-				}
-
-				const where = { _id: chat_id }
-				const query = { $push: { chats: data } }
-
-				let updated = await FindAndUpdate(PersonalChat, where, query, true)
-				if (updated) {
-					if (room_length > 1)
-						socket.broadcast.to(room_name).emit('message', data);
-					else {
-						// notification
-					}
-				}
+			socket.on('disconnect', async function () {
+				online_drivers = online_drivers.filter(item => item !== driver_id)
 			});
 
 		} catch (err) {
@@ -89,7 +90,7 @@ module.exports = {
 	},
 
 
-	RoomChat: async (socket, io) => {
+	/*RoomChat: async (socket, io) => {
 		try {
 			let room_id = null
 			let user = null
@@ -151,8 +152,8 @@ module.exports = {
 				const query = {
 					$push: {
 						chats: {
-							$each: [ data ],
-         					$slice: Config.room_chat_count_limit * -1
+							$each: [data],
+							$slice: Config.room_chat_count_limit * -1
 						}
 					}
 				}
@@ -162,9 +163,9 @@ module.exports = {
 					where: where,
 					update: query
 				})
-				if (updated){
-					socket.emit('message_delivered',{_id: updated.chats[updated.chats.length - 1]._id, message_temp_id: _id});
-					
+				if (updated) {
+					socket.emit('message_delivered', { _id: updated.chats[updated.chats.length - 1]._id, message_temp_id: _id });
+
 					data = {
 						sender_id: user._id,
 						sender_name: user.name,
@@ -228,7 +229,7 @@ module.exports = {
 		} catch (err) {
 			console.log(err)
 		}
-	}
+	}*/
 }
 
 
