@@ -25,7 +25,7 @@ module.exports = {
 				const location = data.location
 				socket.join(driver_id);
 				online_drivers.push(driver_id)
-				
+
 				const driver_vehicles_data = await Find({
 					model: Driver,
 					where: { _id: driver_id },
@@ -55,33 +55,99 @@ module.exports = {
 				})
 
 				if (!nearest_ride_requests)
-					return 
+					return
 
 				socket.emit('initial_ride_requests', nearest_ride_requests);
 			});
 
-			socket.on('accept_tow_request', async (data,callback)=>{
+			socket.on('accept_tow_request', async (data, callback) => {
 				const update = await FindAndUpdate({
 					model: Ride,
 					where: { _id: data.ride_id },
 					update: { $push: { available_drivers: data.driver_id } }
 				});
-				if(update)
-				callback(true)
+				if (update)
+					callback(true)
 			});
 
-			socket.on('decline_tow_request', async (data,callback)=>{
+			socket.on('decline_tow_request', async (data, callback) => {
 				const update = await FindAndUpdate({
 					model: Ride,
 					where: { _id: data.ride_id },
 					update: { $pull: { available_drivers: data.driver_id } }
 				});
-				if(update)
-				callback(true)
+				if (update)
+					callback(true)
 			});
 
 			socket.on('disconnect', async function () {
 				online_drivers = online_drivers.filter(item => item !== driver_id)
+			});
+
+		} catch (err) {
+			console.log(err)
+		}
+	},
+
+
+	UserRideRequest: async (socket, io) => {
+		try {
+			let ride_id = null
+			socket.on('initialize', async (data, callback) => {
+				ride_id = data.ride_id
+				socket.join(ride_id);
+				ride_requests.push(ride_id)
+
+				let ride_data = await Ride.find({ _id: ride_id })
+					.populate({
+						path: 'available_drivers',
+						select: '_id reviews profile_picture location active_vehicle',
+						populate: {
+							path: 'reviews',
+							model: 'reviews'
+						}
+					})
+					.lean()
+					.exec()
+
+				ride_data = ride_data.length > 0 ? ride_data[0] : null
+				if (ride_data) {
+					for (let i = 0; i < ride_data.available_drivers.length; i++) {
+						let item = ride_data.available_drivers[i]
+						const user_details = await Find({
+							model: User,
+							where: { driver_details: item._id },
+							select: 'name mobile'
+						})
+						item.user_details = user_details[0]
+						const vehicle_details = await Find({
+							model: Vehicle,
+							where: { _id: item.active_vehicle, is_approved: true }
+						})
+						item.vehicle_details = vehicle_details.length > 0 ? vehicle_details[0] : null
+						ride_data.available_drivers[i] = item
+					}
+
+					callback(ride_data)
+				}
+			});
+
+			socket.on('cancel_ride_request', async (data, callback) => {
+
+				// TO DO : Add code for realtime deleted status update in driver's socket
+
+				const deleted = await Delete({
+					model: Ride,
+					where: { _id: data.ride_id },
+				})
+				if (!deleted)
+					return
+
+				callback(true)
+			});
+
+			socket.on('disconnect', async function () {
+				ride_requests = ride_requests.filter(item => item !== ride_id)
 			});
 
 		} catch (err) {

@@ -9,6 +9,7 @@ module.exports = (io) => {
     })
     
     io.of('/driver-ride-request').on('connection',(socket)=>Socket.DriverRideRequest(socket,io));
+    io.of('/user-ride-request').on('connection',(socket)=>Socket.UserRideRequest(socket,io));
     /*io.of('/room-chat').on('connection',(socket)=>Socket.RoomChat(socket,io));
     io.of('/picture-comment').on('connection',(socket)=>Socket.PictureComment(socket,io));*/
 };

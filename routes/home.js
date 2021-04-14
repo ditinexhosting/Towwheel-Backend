@@ -11,7 +11,7 @@ router.get('/get-nearest-tows',Home.getNearestTows);
 
 // Protect router after that
 router.use(VerifyToken);
-
+router.get('/get-my-ride-request',Home.getMyRideRequest);
 router.post('/create-ride-request',Home.createRideRequest);
 
 module.exports = router;

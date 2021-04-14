@@ -22,7 +22,7 @@ module.exports = {
 						$near: {
 							$geometry: {
 								type: "Point",
-								coordinates: [longitude,latitude]
+								coordinates: [longitude, latitude]
 							},
 							$maxDistance: Config.max_map_range,
 						}
@@ -48,12 +48,12 @@ module.exports = {
 			let inserted = await Insert({
 				model: Ride,
 				data: {
-					source : {
+					source: {
 						type: 'Point',
 						coordinates: source,
 						address: source_address
 					},
-					destination : {
+					destination: {
 						type: 'Point',
 						coordinates: destination,
 						address: destination_address
@@ -69,6 +69,49 @@ module.exports = {
 				return HandleError(res, 'Failed to create tow request. Please contact system admin.')
 
 			return HandleSuccess(res, inserted)
+
+		} catch (err) {
+			HandleServerError(res, req, err)
+		}
+	},
+
+	getMyRideRequest: async (req, res, next) => {
+		try {
+			const user_id = req.user_id
+			let ride_data = await Ride.find({ user: user_id, ride_status: 'searching' })
+				.sort({ createdAt: -1 })
+				.limit(1)
+				.populate({
+					path: 'available_drivers',
+					select: '_id reviews profile_picture location active_vehicle',
+					populate: {
+						path: 'reviews',
+						model: 'reviews'
+					}
+				})
+				.lean()
+				.exec()
+
+			ride_data = ride_data.length > 0 ? ride_data[0] : null
+			if (ride_data) {
+				for (let i = 0; i < ride_data.available_drivers.length; i++) {
+					let item = ride_data.available_drivers[i]
+					const user_details = await Find({
+						model: User,
+						where: { driver_details: item.id },
+						select: 'name mobile'
+					})
+					item.user_details = user_details[0]
+					const vehicle_details = await Find({
+						model: Vehicle,
+						where: { _id: item.active_vehicle, is_approved: true }
+					})
+					item.vehicle_details = vehicle_details.length > 0 ? vehicle_details[0] : null
+					ride_data.available_drivers[i] = item
+				}
+			}
+
+			return HandleSuccess(res, ride_data)
 
 		} catch (err) {
 			HandleServerError(res, req, err)
