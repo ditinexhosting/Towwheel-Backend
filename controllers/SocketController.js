@@ -102,6 +102,7 @@ module.exports = {
 					.populate({
 						path: 'available_drivers',
 						select: '_id reviews profile_picture location active_vehicle',
+						match: { is_available: true },
 						populate: {
 							path: 'reviews',
 							model: 'reviews'
@@ -144,6 +145,30 @@ module.exports = {
 					return
 
 				callback(true)
+			});
+
+			socket.on('hire_driver', async (data, callback) => {
+
+				// TO DO : Add code for realtime hire status update in driver's socket
+
+				const isDriverAvailable = await FindOne({
+					model: Driver,
+					where: { _id: data.driver_id, is_available: true, active_vehicle: data.active_vehicle }
+				})
+
+				if(isDriverAvailable){
+					const isUpdated = await FindAndUpdate({
+						model: Ride,
+						where: { _id: ride_id, ride_status: 'searching' },
+						update:{
+							$set : { ride_status: 'accepted', assigned_driver: data.driver_id, assigned_vehicle: data.active_vehicle, available_drivers: [] }
+						}
+					})
+					if(isUpdated)
+						callback(isUpdated)
+				}
+
+				return callback(false)
 			});
 
 			socket.on('disconnect', async function () {

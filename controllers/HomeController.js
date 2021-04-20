@@ -78,7 +78,7 @@ module.exports = {
 	getMyRideRequest: async (req, res, next) => {
 		try {
 			const user_id = req.user_id
-			let ride_data = await Ride.find({ user: user_id, ride_status: 'searching' })
+			let ride_data = await Ride.find({ user: user_id, $or: [{ride_status: 'searching'},{ ride_status: 'accepted'},{ride_status: 'started'}] })
 				.sort({ createdAt: -1 })
 				.limit(1)
 				.populate({
