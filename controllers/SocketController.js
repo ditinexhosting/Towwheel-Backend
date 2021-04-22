@@ -20,11 +20,23 @@ module.exports = {
 	DriverRideRequest: async (socket, io) => {
 		try {
 			let driver_id = null
-			socket.on('initialize', async (data) => {
+			socket.on('initialize', async (data, callback) => {
 				driver_id = data._id
 				const location = data.location
 				socket.join(driver_id);
 				online_drivers.push(driver_id)
+
+				const isDriverLocationUpdated = await FindAndUpdate({
+					model: Driver,
+					where: {
+						_id: driver_id,
+					},
+					update: {
+						$set: {
+							'location.coordinates': [data.location.longitude, data.location.latitude]
+						}
+					}
+				})
 
 				const driver_vehicles_data = await Find({
 					model: Driver,
@@ -32,7 +44,7 @@ module.exports = {
 					select: { vehicles: 1 },
 					populate: 'vehicles'
 				})
-				if (!driver_vehicles_data)
+				if (!driver_vehicles_data || !isDriverLocationUpdated)
 					return
 
 				const driver_owned_vehicles = driver_vehicles_data[0].vehicles.map(item => item.type)
@@ -54,10 +66,19 @@ module.exports = {
 					}
 				})
 
-				if (!nearest_ride_requests)
-					return
+				const active_ride = await Find({
+					model: Ride,
+					where: {
+						assigned_driver: driver_id,
+						$or: [{ ride_status: 'accepted' }, { ride_status: 'started' }, { ride_status: 'completed', 'payment_details.is_paid': false }]
+					},
+					sort: { createdAt: -1 },
+					limit: 1,
+					populate: 'user',
+					populateField: 'name mobile'
+				})
 
-				socket.emit('initial_ride_requests', nearest_ride_requests);
+				callback({ nearest_ride_requests, active_ride: active_ride.length > 0 ? active_ride[0] : null });
 			});
 
 			socket.on('accept_tow_request', async (data, callback) => {
@@ -156,15 +177,23 @@ module.exports = {
 					where: { _id: data.driver_id, is_available: true, active_vehicle: data.active_vehicle }
 				})
 
-				if(isDriverAvailable){
+				if (isDriverAvailable) {
 					const isUpdated = await FindAndUpdate({
 						model: Ride,
 						where: { _id: ride_id, ride_status: 'searching' },
-						update:{
-							$set : { ride_status: 'accepted', assigned_driver: data.driver_id, assigned_vehicle: data.active_vehicle, available_drivers: [] }
+						update: {
+							$set: { ride_status: 'accepted', assigned_driver: data.driver_id, assigned_vehicle: data.active_vehicle, available_drivers: [], 'payment_details.cost': data.cost }
 						}
 					})
-					if(isUpdated)
+					const driverChangeAvailability = await FindAndUpdate({
+						model: Driver,
+						where: { _id: data.driver_id, is_available: true, active_vehicle: data.active_vehicle },
+						update: {
+							$set: { is_available: false }
+						}
+					})
+
+					if (isUpdated && driverChangeAvailability)
 						callback(isUpdated)
 				}
 
@@ -173,6 +202,121 @@ module.exports = {
 
 			socket.on('disconnect', async function () {
 				ride_requests = ride_requests.filter(item => item !== ride_id)
+			});
+
+		} catch (err) {
+			console.log(err)
+		}
+	},
+
+	UserDriverInprogress: async (socket, io) => {
+		try {
+			let ride_id = null
+			socket.on('initialize_user', async (data, callback) => {
+				ride_id = data.ride_id
+				socket.join(ride_id);
+				let ride_data = await Ride.findOne({ _id: ride_id })
+					.populate({
+						path: 'assigned_driver',
+						populate: {
+							path: 'reviews',
+							model: 'reviews'
+						}
+					})
+					.populate({
+						path: 'assigned_vehicle',
+					})
+					.lean()
+					.exec()
+				if (ride_data) {
+					const user_details = await FindOne({
+						model: User,
+						where: { driver_details: ride_data.assigned_driver },
+						select: 'name mobile'
+					})
+					ride_data.driver_details = user_details
+					callback(ride_data)
+				}
+			});
+
+			socket.on('initialize_driver', async (data, callback) => {
+				ride_id = data.ride_id
+				socket.join(ride_id);
+				const ride_data = await Find({
+					model: Ride,
+					where: {
+						_id: ride_id
+					},
+					populate: 'user',
+					populateField: 'name mobile'
+				})
+
+				if (ride_data.length > 0)
+					callback(ride_data[0])
+			});
+
+			socket.on('update_driver_location', async (data) => {
+				const isDriverLocationUpdated = await FindAndUpdate({
+					model: Driver,
+					where: {
+						_id: data.driver_id,
+					},
+					update: {
+						$set: {
+							'location.coordinates': [data.location.longitude, data.location.latitude],
+							'location.heading': data.location.heading
+						}
+					}
+				})
+
+				if (isDriverLocationUpdated && ride_id)
+					socket.to(ride_id).emit('driver_location_changed', data.location)
+			});
+
+			socket.on('cancel_ride_request', async (data, callback) => {
+
+				// TO DO : Add code for realtime deleted status update in driver's socket
+
+				const driverChangeAvailability = await FindAndUpdate({
+					model: Driver,
+					where: { _id: data.driver_id },
+					update: {
+						$set: { is_available: true }
+					}
+				})
+
+				const deleted = await Delete({
+					model: Ride,
+					where: { _id: data.ride_id },
+				})
+				if (!deleted)
+					return
+
+				callback(true)
+				socket.to(ride_id).emit('cancel_ride_request')
+
+			});
+
+			socket.on('start_tow_ride', async (data, callback) => {
+				const rideStarted = await FindAndUpdate({
+					model: Ride,
+					where: {
+						_id: data.ride_id,
+					},
+					update: {
+						$set: {
+							ride_status: 'started'
+						}
+					}
+				})
+				if (rideStarted) {
+					callback(true)
+					socket.to(ride_id).emit('start_tow_ride', true)
+				}
+			});
+
+			socket.on('disconnect', async function () {
+
 			});
 
 		} catch (err) {
