@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { RealtimeListener } = require('../services')
 const Config = require('../config.js');
 const fs = require('fs');
 const { User, ProfilePicture, Driver, Vehicle, Ride, Mongoose } = require('../models')
@@ -67,6 +68,13 @@ module.exports = {
 			})
 			if (!inserted)
 				return HandleError(res, 'Failed to create tow request. Please contact system admin.')
+			
+			/*
+			 *	Trigger Realtime update event
+			 */
+
+			RealtimeListener.realtimeDbEvent.emit('new_booking_update',source)
+
 
 			return HandleSuccess(res, inserted)
 

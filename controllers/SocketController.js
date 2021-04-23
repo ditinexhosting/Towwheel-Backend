@@ -87,8 +87,15 @@ module.exports = {
 					where: { _id: data.ride_id },
 					update: { $push: { available_drivers: data.driver_id } }
 				});
-				if (update)
+				if (update) {
 					callback(true)
+
+					/*
+						   *	Trigger Realtime update event
+						   */
+
+					RealtimeListener.realtimeDbEvent.emit('new_driver_update', data.ride_id)
+				}
 			});
 
 			socket.on('decline_tow_request', async (data, callback) => {
@@ -97,13 +104,21 @@ module.exports = {
 					where: { _id: data.ride_id },
 					update: { $pull: { available_drivers: data.driver_id } }
 				});
-				if (update)
+				if (update) {
 					callback(true)
+
+					/*
+						   *	Trigger Realtime update event
+						   */
+
+					RealtimeListener.realtimeDbEvent.emit('new_driver_update', data.ride_id)
+				}
 			});
 
 			socket.on('disconnect', async function () {
 				online_drivers = online_drivers.filter(item => item !== driver_id)
 			});
+
 
 		} catch (err) {
 			console.log(err)
@@ -158,19 +173,32 @@ module.exports = {
 
 				// TO DO : Add code for realtime deleted status update in driver's socket
 
+				const rideLocation = await FindOne({
+					model: Ride,
+					where: { _id: data.ride_id },
+					select: {
+						'source.coordinates': 1
+					}
+				})
+
 				const deleted = await Delete({
 					model: Ride,
 					where: { _id: data.ride_id },
 				})
-				if (!deleted)
+				if (!rideLocation || !deleted)
 					return
 
 				callback(true)
+
+				  /*
+				   *	Trigger Realtime update event
+				   */
+
+				RealtimeListener.realtimeDbEvent.emit('new_booking_update', rideLocation.source.coordinates)
+
 			});
 
 			socket.on('hire_driver', async (data, callback) => {
-
-				// TO DO : Add code for realtime hire status update in driver's socket
 
 				const isDriverAvailable = await FindOne({
 					model: Driver,
@@ -193,8 +221,15 @@ module.exports = {
 						}
 					})
 
-					if (isUpdated && driverChangeAvailability)
+					if (isUpdated && driverChangeAvailability){
 						callback(isUpdated)
+						
+						/*
+				   		 *	Trigger Realtime update event
+				   		 */
+
+						RealtimeListener.realtimeDbEvent.emit('hire_driver_update', data.driver_id)
+					}
 				}
 
 				return callback(false)
@@ -203,6 +238,7 @@ module.exports = {
 			socket.on('disconnect', async function () {
 				ride_requests = ride_requests.filter(item => item !== ride_id)
 			});
+
 
 		} catch (err) {
 			console.log(err)
@@ -315,9 +351,95 @@ module.exports = {
 				}
 			});
 
+			socket.on('complete_ride', async (data, callback) => {
+				const rideCompleted = await FindAndUpdate({
+					model: Ride,
+					where: {
+						_id: data.ride_id,
+					},
+					update: {
+						$set: {
+							ride_status: 'completed',
+							'payment_details.is_paid': true,
+						}
+					}
+				})
+				if (rideCompleted) {
+					const driverChangeAvailability = await FindAndUpdate({
+						model: Driver,
+						where: { _id: rideCompleted.assigned_driver },
+						update: {
+							$set: { is_available: true }
+						}
+					})
+					callback(true)
+					socket.to(ride_id).emit('complete_ride', true)
+				}
+			});
+
 			socket.on('disconnect', async function () {
 
 			});
+
+
+		} catch (err) {
+			console.log(err)
+		}
+	},
+
+
+	/*
+	 *	Realtime Data updates
+	 */
+
+
+	RealtimeDatabaseUpdates: async (socket, io) => {
+		try {
+
+			socket.on('new_driver_update', async ride_id => {
+
+				if (ride_requests.filter(d => d == ride_id).length > 0)
+					io.of('/user-ride-request').to(ride_id + '').emit('new_driver_update', true)
+
+			});
+
+			socket.on('hire_driver_update', async driver_id => {
+
+				if (online_drivers.filter(d => d == driver_id).length > 0)
+						io.of('/driver-ride-request').to(driver_id + '').emit('new_booking_update', true)
+
+			});
+
+			socket.on('new_booking_update', async location => {
+				const nearest_drivers = await Find({
+					model: Driver,
+					where: {
+						location: {
+							$near: {
+								$geometry: {
+									type: "Point",
+									coordinates: [location[0], location[1]]
+								},
+								$maxDistance: Config.max_map_range,
+							}
+						}
+					},
+					select: {
+						_id: 1
+					}
+				})
+
+				nearest_drivers.map(driver => {
+					if (online_drivers.filter(d => d == driver._id).length > 0)
+						io.of('/driver-ride-request').to(driver._id + '').emit('new_booking_update', true)
+				})
+
+			});
+
+			socket.on('disconnect', async function () {
+
+			});
+
 
 		} catch (err) {
 			console.log(err)
