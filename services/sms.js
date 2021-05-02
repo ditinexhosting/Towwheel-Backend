@@ -7,21 +7,23 @@ module.exports = (mobile,otp) => {
     try {
         var params = {
           Message: 'Your Tow Wheel OTP is '+otp+'.',
-          PhoneNumber: mobile,
+          PhoneNumber: mobile
         };
-        SNS.checkIfPhoneNumberIsOptedOut({phoneNumber: mobile},(err,data)=>{
+        SNS.publish(params,(err,data)=>{
+          console.log('aws otp >>>',err,data)
+          if (err)
+            reject(err)
+
+          if(data.MessageId)
+            resolve(true)
+        })
+        /*SNS.checkIfPhoneNumberIsOptedOut({phoneNumber: mobile},(err,data)=>{
           if (err)
             reject(err)
             
           if(!data.isOptedOut)
-            SNS.publish(params,(err,data)=>{
-              if (err)
-                reject(err)
-
-              if(data.MessageId)
-                resolve(true)
-            })
-        })
+            
+        })*/
     }
     catch (err) {
       console.log(err)
