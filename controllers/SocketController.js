@@ -272,7 +272,7 @@ module.exports = {
 					})
 					ride_data.driver_details = driver_details
 					// console.log(driver_details._id,ride_data.user,'user')
-					const unread_chats = await Find({
+					const unread_chats = await FindOne({
 						model: Chat,
 						where: {
 							$and: [
@@ -282,8 +282,8 @@ module.exports = {
 							chats: { $elemMatch: { seen: false, sender: driver_details._id } }
 						}
 					})
-					ride_data.unread_chat_count = unread_chats.chats?unread_chats.chats.length:0
-					console.log(unread_chats[0].chats)
+					// ride_data.unread_chat_count = unread_chats.chats?unread_chats.chats.length:0
+					console.log(unread_chats)
 					callback(ride_data)
 				}
 			});
@@ -291,7 +291,7 @@ module.exports = {
 			socket.on('initialize_driver', async (data, callback) => {
 				ride_id = data.ride_id
 				socket.join(ride_id);
-				const ride_data = await FindOne({
+				const ride_data = await Find({
 					model: Ride,
 					where: {
 						_id: ride_id
@@ -299,26 +299,27 @@ module.exports = {
 					populate: 'user',
 					populateField: 'name mobile'
 				})
-				if (ride_data)
+				if (ride_data.length>0)
 				{
 					const driver_details = await FindOne({
 						model: User,
-						where: { driver_details: ride_data.assigned_driver },
+						where: { driver_details: ride_data[0].assigned_driver },
 						select: '_id name mobile'
 					})
-					console.log(driver_details._id,ride_data.user)
-					const unread_chats = await FindOne({
-						model: Chat,
-						where: {
-							$and: [
-								{ members: driver_details._id },
-								{ members: ride_data.user._id }
-							],
-						}
-					})
-					ride_data.unread_chat_count = unread_chats.chats?unread_chats.chats.length:0
-					console.log(unread_chats)
-					callback(ride_data)
+					console.log(driver_details._id,ride_data[0].user._id)
+					// const unread_chats = await FindOne({
+					// 	model: Chat,
+					// 	where: {
+					// 		$and: [
+					// 			{ members: ride_data[0].user._id },
+					// 			{ members: "driver_details._id" },
+					// 			{ "chats.seen": false }
+					// 		],
+					// 	}
+					// })
+					// ride_data.unread_chat_count = unread_chats.chats?unread_chats.chats.length:0
+					// console.log(unread_chats.chats.length)
+					callback(ride_data[0])
 				}
 			});
 
@@ -429,6 +430,7 @@ module.exports = {
 				user_id = data.user_id
 				partner_id = data.partner_id
 				ride_id = data.ride_id
+				console.log(user_id,partner_id)
 				let chats = await FindOne({
 					model: Chat,
 					where: {
