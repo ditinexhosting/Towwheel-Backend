@@ -271,19 +271,25 @@ module.exports = {
 						select: '_id name mobile'
 					})
 					ride_data.driver_details = driver_details
-					// console.log(driver_details._id,ride_data.user,'user')
-					const unread_chats = await FindOne({
+
+					const unread_chat_count = await Aggregate({
 						model: Chat,
-						where: {
-							$and: [
-								{ members: ride_data.user },
-								{ members: driver_details._id }
-							],
-							chats: { $elemMatch: { seen: false, sender: driver_details._id } }
-						}
+						data: [
+							{
+								$match: {
+									$and: [
+										{ members: ride_data.user },
+										{ members: driver_details._id }
+									],
+									chats: { $elemMatch: { seen : false, sender: driver_details._id } }
+								}
+							},
+							{ $unwind : "$chats" },
+							{ $match: { "chats.seen" : false, "chats.sender": driver_details._id } },
+							{ $group : { _id : "$_id", chats : { $addToSet : "$chats" } }}
+						]
 					})
-					// ride_data.unread_chat_count = unread_chats.chats?unread_chats.chats.length:0
-					console.log(unread_chats)
+					ride_data.unread_chat_count = unread_chat_count[0]?unread_chat_count[0].chats.length:0
 					callback(ride_data)
 				}
 			});
@@ -299,26 +305,31 @@ module.exports = {
 					populate: 'user',
 					populateField: 'name mobile'
 				})
-				if (ride_data.length>0)
-				{
+				if (ride_data.length > 0) {
 					const driver_details = await FindOne({
 						model: User,
 						where: { driver_details: ride_data[0].assigned_driver },
 						select: '_id name mobile'
 					})
-					console.log(driver_details._id,ride_data[0].user._id)
-					// const unread_chats = await FindOne({
-					// 	model: Chat,
-					// 	where: {
-					// 		$and: [
-					// 			{ members: ride_data[0].user._id },
-					// 			{ members: "driver_details._id" },
-					// 			{ "chats.seen": false }
-					// 		],
-					// 	}
-					// })
-					// ride_data.unread_chat_count = unread_chats.chats?unread_chats.chats.length:0
-					// console.log(unread_chats.chats.length)
+					const unread_chat_count = await Aggregate({
+						model: Chat,
+						data: [
+							{
+								$match: {
+									$and: [
+										{ members: ride_data[0].user._id },
+										{ members: driver_details._id }
+									],
+									chats: { $elemMatch: { seen : false, sender: ride_data[0].user._id } }
+								}
+							},
+							{ $unwind : "$chats" },
+							{ $match: { "chats.seen" : false, "chats.sender": ride_data[0].user._id } },
+							{ $group : { _id : "$_id", chats : { $addToSet : "$chats" } }}
+						]
+					})
+
+					ride_data[0].unread_chat_count = unread_chat_count[0]?unread_chat_count[0].chats.length:0
 					callback(ride_data[0])
 				}
 			});
@@ -430,7 +441,6 @@ module.exports = {
 				user_id = data.user_id
 				partner_id = data.partner_id
 				ride_id = data.ride_id
-				console.log(user_id,partner_id)
 				let chats = await FindOne({
 					model: Chat,
 					where: {
@@ -449,11 +459,11 @@ module.exports = {
 						{
 							$set: { 'chats.$[chat].seen': true }
 						},
-						{ 
+						{
 							arrayFilters: [
 								{ "chat.receiver": user_id },
 							],
-							new: true 
+							new: true
 						}
 					).exec()
 					socket.broadcast.to(chat_id).emit('bulk_seen', chats.chats)
@@ -497,13 +507,10 @@ module.exports = {
 					const inserted = chats.chats.slice(-1)[0]
 					callback(inserted)
 
-					//console.log('Room Size >> ',io.of("/live-chat").adapter.rooms.get(chat_id).size)
-
 					if (io.of("/live-chat").adapter.rooms.get(chat_id).size > 1)
 						socket.broadcast.to(chat_id).emit('new_message', inserted)
 					else {
 						//push alert
-						//console.log('Push alert trying > ',ride_id)
 						io.of('/user-driver-inprogress').to(ride_id + '').emit('new_message', inserted)
 					}
 
@@ -516,7 +523,7 @@ module.exports = {
 					model: Chat,
 					where: { _id: chat_id, 'chats._id': message_id },
 					update: {
-						$set: {'chats.$.seen': true}
+						$set: { 'chats.$.seen': true }
 					}
 				})
 
