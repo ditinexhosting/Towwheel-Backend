@@ -265,12 +265,25 @@ module.exports = {
 					.lean()
 					.exec()
 				if (ride_data) {
-					const user_details = await FindOne({
+					const driver_details = await FindOne({
 						model: User,
-						where: { driver_details: ride_data.assigned_driver },
+						where: { driver_details: ride_data.assigned_driver._id },
 						select: '_id name mobile'
 					})
-					ride_data.driver_details = user_details
+					ride_data.driver_details = driver_details
+					// console.log(driver_details._id,ride_data.user,'user')
+					const unread_chats = await Find({
+						model: Chat,
+						where: {
+							$and: [
+								{ members: ride_data.user },
+								{ members: driver_details._id }
+							],
+							chats: { $elemMatch: { seen: false, sender: driver_details._id } }
+						}
+					})
+					ride_data.unread_chat_count = unread_chats.chats?unread_chats.chats.length:0
+					console.log(unread_chats[0].chats)
 					callback(ride_data)
 				}
 			});
@@ -278,7 +291,7 @@ module.exports = {
 			socket.on('initialize_driver', async (data, callback) => {
 				ride_id = data.ride_id
 				socket.join(ride_id);
-				const ride_data = await Find({
+				const ride_data = await FindOne({
 					model: Ride,
 					where: {
 						_id: ride_id
@@ -286,9 +299,27 @@ module.exports = {
 					populate: 'user',
 					populateField: 'name mobile'
 				})
-
-				if (ride_data.length > 0)
-					callback(ride_data[0])
+				if (ride_data)
+				{
+					const driver_details = await FindOne({
+						model: User,
+						where: { driver_details: ride_data.assigned_driver },
+						select: '_id name mobile'
+					})
+					console.log(driver_details._id,ride_data.user)
+					const unread_chats = await FindOne({
+						model: Chat,
+						where: {
+							$and: [
+								{ members: driver_details._id },
+								{ members: ride_data.user._id }
+							],
+						}
+					})
+					ride_data.unread_chat_count = unread_chats.chats?unread_chats.chats.length:0
+					console.log(unread_chats)
+					callback(ride_data)
+				}
 			});
 
 			socket.on('update_driver_location', async (data) => {
