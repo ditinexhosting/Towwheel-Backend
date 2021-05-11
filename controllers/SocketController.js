@@ -78,7 +78,7 @@ module.exports = {
 					populateField: 'name mobile'
 				})
 
-				callback({ nearest_ride_requests, active_ride: active_ride.length > 0 ? active_ride[0] : null });
+				callback({ nearest_ride_requests, vehicles_data: driver_vehicles_data[0].vehicles, active_ride: active_ride.length > 0 ? active_ride[0] : null });
 			});
 
 			socket.on('accept_tow_request', async (data, callback) => {
