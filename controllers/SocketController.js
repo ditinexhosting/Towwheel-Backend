@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const Config = require('../config.js');
 const fs = require('fs');
 const { RealtimeListener } = require('../services')
-const { User, ProfilePicture, Driver, Vehicle, Ride, Chat, Mongoose } = require('../models')
+const { User, ProfilePicture, Driver, Vehicle, Ride, Chat, Garage, Mongoose } = require('../models')
 const Controllers = require('../controllers')
 
 const {
@@ -448,6 +448,25 @@ module.exports = {
 					})
 					callback(true)
 					socket.to(ride_id).emit('complete_ride', true)
+				}
+			});
+
+			socket.on('change_destination', async (data, callback) => {
+				const updated = await FindAndUpdate({
+					model: Ride,
+					where: {
+						_id: ride_id,
+					},
+					update: {
+						$set: {
+							'destination.coordinates': [data.longitude,data.latitude],
+							'destination.address': data.address
+						}
+					}
+				})
+				if (updated) {
+					callback(true)
+					socket.to(ride_id).emit('change_destination', data)
 				}
 			});
 
