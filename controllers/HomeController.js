@@ -128,7 +128,7 @@ module.exports = {
 	getNearestGarages: async (req, res, next) => {
 		try {
 			let { latitude, longitude } = req.query
-			const insert = await Insert({
+			/*const insert = await Insert({
 				model: Garage,
 				data: {
 					"_id": {
@@ -156,7 +156,7 @@ module.exports = {
 					},
 					"__v": 0
 				  }
-			})
+			})*/
 			const data = await Find({
 				model: Garage,
 				where: {
