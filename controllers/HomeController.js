@@ -128,6 +128,35 @@ module.exports = {
 	getNearestGarages: async (req, res, next) => {
 		try {
 			let { latitude, longitude } = req.query
+			const data = await Insert({
+				model: Garage,
+				data: {
+					"_id": {
+					  "$oid": "60a6a4e55aacda0ccda2c79a"
+					},
+					"rating": [
+					  4.3
+					],
+					"name": "Haripal Garage",
+					"address": "Haripal Basudebpur, Hooghly, West Bengal, India",
+					"mobile": "+919903614705",
+					"image": "/images/avatar.png",
+					"location": {
+					  "type": "Point",
+					  "coordinates": [
+						88.1047287,
+						22.8183172
+					  ]
+					},
+					"createdAt": {
+					  "$date": "2021-05-20T18:05:25.581Z"
+					},
+					"updatedAt": {
+					  "$date": "2021-05-20T18:05:25.581Z"
+					},
+					"__v": 0
+				  }
+			})
 			const data = await Find({
 				model: Garage,
 				where: {
