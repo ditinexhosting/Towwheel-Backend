@@ -177,6 +177,7 @@ module.exports = {
 			return HandleSuccess(res, data)
 
 		} catch (err) {
+			console.log('Node error >>',err)
 			HandleServerError(res, req, err)
 		}
 	},
